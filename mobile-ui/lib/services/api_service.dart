@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:smart_parking/core/constants.dart';
 
 class ApiService {
-  final String baseUrl = "http://10.0.2.2:8080/api"; // TODO: Replace with Azure link on deploy
+  final String baseUrl = AppConstants.baseApiUrl;
   final FlutterSecureStorage storage = const FlutterSecureStorage();
 
   // Login function to exchange Google ID token for JWT

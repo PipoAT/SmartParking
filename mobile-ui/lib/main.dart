@@ -7,7 +7,16 @@ import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  
+  // Initialize Firebase - gracefully handle if not configured
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    // Firebase not configured - app can still work without it
+    debugPrint('Firebase initialization failed: $e');
+    debugPrint('App will continue without Firebase features.');
+  }
+  
   runApp(
     ChangeNotifierProvider(
       create: (_) => AuthProvider(),
