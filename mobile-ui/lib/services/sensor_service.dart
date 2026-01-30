@@ -6,6 +6,7 @@ import 'package:smart_parking/core/constants.dart';
 class SensorService {
   final String baseUrl = AppConstants.baseApiUrl;
   Timer? _sensorPollingTimer;
+  bool _isReading = false;
 
   // Get current light sensor reading from backend
   Future<int?> getLightSensorReading() async {
@@ -13,16 +14,22 @@ class SensorService {
       final response = await http.get(
         Uri.parse('$baseUrl/LightSensor/read'),
         headers: {"Content-Type": "application/json"},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        // The endpoint returns just the light level value as text
-        final lightLevel = int.tryParse(response.body.trim());
+        // The endpoint returns JSON with lightLevel and timestamp
+        final data = jsonDecode(response.body);
+        final lightLevel = data['lightLevel'] as int?;
         return lightLevel;
       }
       return null;
+    } on TimeoutException {
+      // Log timeout for debugging
+      print('Warning: Sensor reading timed out');
+      return null;
     } catch (e) {
       // Sensor might not be available, return null
+      print('Warning: Failed to read sensor: $e');
       return null;
     }
   }
@@ -33,9 +40,17 @@ class SensorService {
     _sensorPollingTimer = Timer.periodic(
       Duration(milliseconds: AppConstants.sensorRefreshInterval),
       (_) async {
-        final reading = await getLightSensorReading();
-        if (reading != null) {
-          onDataReceived(reading);
+        // Prevent overlapping requests
+        if (_isReading) return;
+        
+        _isReading = true;
+        try {
+          final reading = await getLightSensorReading();
+          if (reading != null) {
+            onDataReceived(reading);
+          }
+        } finally {
+          _isReading = false;
         }
       },
     );

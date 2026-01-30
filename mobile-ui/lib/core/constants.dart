@@ -1,4 +1,6 @@
-import 'dart:io' show Platform;
+import 'constants_stub.dart'
+    if (dart.library.io) 'constants_io.dart'
+    if (dart.library.html) 'constants_web.dart';
 
 class AppConstants {
   // API Configuration
@@ -11,17 +13,8 @@ class AppConstants {
       return envApiUrl;
     }
     
-    // Platform-specific defaults for local development
-    if (Platform.isAndroid) {
-      // Android emulator uses 10.0.2.2 to access host machine
-      return 'http://10.0.2.2:8080/api';
-    } else if (Platform.isIOS) {
-      // iOS simulator can use localhost
-      return 'http://localhost:8080/api';
-    } else {
-      // Web, desktop, or other platforms
-      return 'http://localhost:8080/api';
-    }
+    // Use platform-specific implementation
+    return getDefaultApiUrl();
   }
 
   // App Information

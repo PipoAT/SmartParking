@@ -111,72 +111,81 @@ public class LightSensorController : ControllerBase
     [HttpGet("read")]
     public IActionResult ReadSensor()
     {
-        if (_serialPort == null)
+        lock (_lock)
         {
-            return StatusCode(503, new { error = "Serial port not initialized. Sensor hardware may not be connected." });
-        }
+            if (_serialPort == null)
+            {
+                return StatusCode(503, new { error = "Serial port not initialized. Sensor hardware may not be connected." });
+            }
 
-        if (!_serialPort.IsOpen)
-        {
-            // Try to reopen the port
+            if (!_serialPort.IsOpen)
+            {
+                // Try to reopen the port
+                try
+                {
+                    _serialPort.Open();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Failed to reopen serial port: {ex.Message}");
+                    return StatusCode(503, new { error = "Serial port is closed and could not be reopened." });
+                }
+            }
+
             try
             {
-                _serialPort.Open();
+                // Clear any existing data in buffer
+                _serialPort.DiscardInBuffer();
+                
+                // Read a line from the sensor
+                string data = _serialPort.ReadLine().Trim();
+                
+                // Validate that we got numeric data
+                if (int.TryParse(data, out int lightLevel))
+                {
+                    return Ok(new { lightLevel = lightLevel, timestamp = DateTime.UtcNow });
+                }
+                else
+                {
+                    _logger.LogWarning($"Invalid sensor data received: {data}");
+                    return BadRequest(new { error = "Invalid sensor data received" });
+                }
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogWarning("Timeout reading from serial port");
+                return StatusCode(408, new { error = "Timeout reading from serial port. Sensor may not be responding." });
             }
             catch (Exception ex)
             {
-                return StatusCode(503, new { error = $"Serial port is closed and could not be reopened: {ex.Message}" });
+                _logger.LogError($"Error reading from serial port: {ex.Message}");
+                return StatusCode(500, new { error = "Error reading from serial port" });
             }
-        }
-
-        try
-        {
-            // Clear any existing data in buffer
-            _serialPort.DiscardInBuffer();
-            
-            // Read a line from the sensor
-            string data = _serialPort.ReadLine().Trim();
-            
-            // Validate that we got numeric data
-            if (int.TryParse(data, out int lightLevel))
-            {
-                return Ok(new { lightLevel = lightLevel, timestamp = DateTime.UtcNow });
-            }
-            else
-            {
-                return BadRequest(new { error = "Invalid sensor data received", rawData = data });
-            }
-        }
-        catch (TimeoutException)
-        {
-            return StatusCode(408, new { error = "Timeout reading from serial port. Sensor may not be responding." });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error reading from serial port: {ex.Message}");
-            return StatusCode(500, new { error = $"Error reading from serial port: {ex.Message}" });
         }
     }
 
     [HttpGet("status")]
     public IActionResult GetStatus()
     {
-        if (_serialPort == null)
+        lock (_lock)
         {
+            if (_serialPort == null)
+            {
+                return Ok(new 
+                { 
+                    connected = false, 
+                    message = "Serial port not initialized",
+                    availablePorts = SerialPort.GetPortNames()
+                });
+            }
+
             return Ok(new 
             { 
-                connected = false, 
-                message = "Serial port not initialized",
+                connected = _serialPort.IsOpen,
+                portName = _serialPort.PortName,
+                baudRate = _serialPort.BaudRate,
                 availablePorts = SerialPort.GetPortNames()
             });
         }
-
-        return Ok(new 
-        { 
-            connected = _serialPort.IsOpen,
-            portName = _serialPort.PortName,
-            baudRate = _serialPort.BaudRate,
-            availablePorts = SerialPort.GetPortNames()
-        });
     }
 }

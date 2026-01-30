@@ -40,14 +40,31 @@ builder.Services.AddAuthentication()
 builder.Services.AddAuthorization();
 
 // Add CORS for cross-platform support (mobile apps, web clients)
+var corsOrigins = builder.Configuration.GetValue<string>("Cors:AllowedOrigins", "*");
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    if (corsOrigins == "*")
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+        // Development mode - allow all origins
+        options.AddPolicy("AllowAll", policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
+    }
+    else
+    {
+        // Production mode - restrict to specific origins
+        var origins = corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        options.AddPolicy("AllowAll", policy =>
+        {
+            policy.WithOrigins(origins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        });
+    }
 });
 
 // Add MVC Controllers
@@ -58,36 +75,45 @@ var app = builder.Build();
 
 // Test MongoDB connection and log the result
 var mongoConnectionString = builder.Configuration.GetValue<string>("MONGO_DB_CONNECTION_STRING");
-var client = new MongoClient(mongoConnectionString);
-var database = client.GetDatabase("SmartParkingDb");
 
-int maxRetries = 10;
-int retryCount = 0;
-bool connected = false;
-
-while (retryCount < maxRetries && !connected)
+if (!string.IsNullOrEmpty(mongoConnectionString))
 {
-    try
+    var client = new MongoClient(mongoConnectionString);
+    var databaseName = builder.Configuration.GetValue<string>("MongoDbSettings:DatabaseName", "SmartParkingDb");
+    var database = client.GetDatabase(databaseName);
+
+    int maxRetries = 10;
+    int retryCount = 0;
+    bool connected = false;
+
+    while (retryCount < maxRetries && !connected)
     {
-        // Run a simple command to test the connection
-        database.RunCommandAsync((Command<BsonDocument>)"{ping:1}").Wait();
-        app.Logger.LogInformation("Successfully connected to MongoDB.");
-        connected = true;
-    }
-    catch (Exception ex)
-    {
-        retryCount++;
-        app.Logger.LogWarning($"Attempt {retryCount}/{maxRetries} failed to connect to MongoDB: {ex.Message}");
-        if (retryCount >= maxRetries)
+        try
         {
-            app.Logger.LogError("Max retries reached. Failed to connect to MongoDB.");
+            // Run a simple command to test the connection
+            database.RunCommandAsync((Command<BsonDocument>)"{ping:1}").Wait();
+            app.Logger.LogInformation("Successfully connected to MongoDB.");
+            connected = true;
         }
-        else
+        catch (Exception ex)
         {
-            // Wait before retrying
-            System.Threading.Thread.Sleep(5000); // 5-second delay
+            retryCount++;
+            app.Logger.LogWarning($"Attempt {retryCount}/{maxRetries} failed to connect to MongoDB: {ex.Message}");
+            if (retryCount >= maxRetries)
+            {
+                app.Logger.LogError("Max retries reached. Failed to connect to MongoDB.");
+            }
+            else
+            {
+                // Wait before retrying
+                System.Threading.Thread.Sleep(5000); // 5-second delay
+            }
         }
     }
+}
+else
+{
+    app.Logger.LogWarning("MONGO_DB_CONNECTION_STRING not configured. Database features will be unavailable.");
 }
 
 // Configure the HTTP request pipeline
