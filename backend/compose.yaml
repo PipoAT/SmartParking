@@ -9,20 +9,24 @@ services:
     networks:
       - app-network
     environment:
-      - MONGO_DB_CONNECTION_STRING=mongodb://myUser:myPassword@mongo:27017/SmartParkingDb?authMechanism=SCRAM-SHA-1
-      - MongoDbSettings__DatabaseName=SmartParkingDb
+      - MONGO_DB_CONNECTION_STRING=${MONGO_DB_CONNECTION_STRING:-mongodb://myUser:myPassword@mongo:27017/SmartParkingDb?authMechanism=SCRAM-SHA-1}
+      - MongoDbSettings__DatabaseName=${MONGODB_DATABASE:-SmartParkingDb}
+      - JWT_SECRET=${JWT_SECRET:-%JWT_SECRET%}
+      - SERIAL_PORT_NAME=${SERIAL_PORT_NAME:-}
+      - SERIAL_PORT_BAUD_RATE=${SERIAL_PORT_BAUD_RATE:-9600}
     ports:
       - "8080:8080"
       - "8081:8081"
     depends_on:
       - mongo
+    restart: unless-stopped
 
   mongo:
     image: mongo:latest
     container_name: mongo
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=myUser
-      - MONGO_INITDB_ROOT_PASSWORD=myPassword
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-myUser}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-myPassword}
     ports:
       - "27017:27017"
     volumes:
@@ -30,6 +34,7 @@ services:
       - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
     networks:
       - app-network
+    restart: unless-stopped
 
 volumes:
   mongo-data:

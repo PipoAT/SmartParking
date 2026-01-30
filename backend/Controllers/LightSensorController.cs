@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 [ApiController]
 public class LightSensorController : ControllerBase
 {
-    private static SerialPort _serialPort;
+    private static SerialPort? _serialPort;
     private static readonly object _lock = new object();
     private readonly IConfiguration _configuration;
     private readonly ILogger<LightSensorController> _logger;
@@ -34,7 +34,7 @@ public class LightSensorController : ControllerBase
         try
         {
             // Try to get port from configuration first
-            string portName = _configuration["SerialPort:PortName"];
+            string? portName = _configuration["SerialPort:PortName"];
             int baudRate = _configuration.GetValue<int>("SerialPort:BaudRate", 9600);
 
             // If not configured, try to auto-detect
@@ -65,7 +65,7 @@ public class LightSensorController : ControllerBase
         }
     }
 
-    private string AutoDetectSerialPort()
+    private string? AutoDetectSerialPort()
     {
         try
         {

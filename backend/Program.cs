@@ -39,6 +39,17 @@ builder.Services.AddAuthentication()
 
 builder.Services.AddAuthorization();
 
+// Add CORS for cross-platform support (mobile apps, web clients)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 // Add MVC Controllers
 builder.Services.AddControllers();
 
@@ -88,6 +99,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
+
+// Enable CORS
+app.UseCors("AllowAll");
 
 // Apply JWT Middleware for authentication
 app.UseMiddleware<JwtMiddleware>();
